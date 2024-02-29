@@ -6,7 +6,8 @@ from database import db
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from Users.User import User
-from Complaints.Complaint import Complaint
+from Complaint import *
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///my_database.db'
@@ -144,47 +145,53 @@ def update_user():
         return jsonify({'error': 'User not found'}, 404)
 
 
-@app.route('/api/addComplaint', methods=['POST'])
-def add_complaint():
-    # Get the data from the request
-    data = request.get_json()
-    if data:
-        # Create a new complaint
-        complaint = Complaint(
-            title=data.get('title'),
-            description=data.get('description'),
-            user_id=data.get('user_id'),
-            created_at=datetime.now()
-        )
-        db.session.add(complaint)
-        db.session.commit()
-        return jsonify({'message': 'Complaint created successfully'}, 201)
-    else:
-        return jsonify({'error': 'The request payload is empty'}, 400)
-
 @app.route('/api/complaints', methods=['GET'])
 def get_complaints():
-    complaints = Complaint.get_all_complaints()
+    conn = sqlite3.connect('instance/my_database.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM complaint')
+    complaints = cursor.fetchall()
     if complaints:
-        return jsonify([complaint.serialize() for complaint in complaints], 200)
+        return jsonify(complaints, 200)
     else:
         return jsonify({'error': 'No complaints found'}, 404)
 
-
-@app.route('/api/respondTocomplaint', methods=['GET'])
-def respond_to_complaint():
+@app.route('/api/complaints/addComplaint', methods=['POST'])
+def add_complaint():
     data = request.get_json()
-    id = data.get('id')
-    response = data.get('response')
-    full_name = data.get('full_name')
-    username = data.get('username')
-    complaint = Complaint.respond_complaint(id, response, full_name, username)
-    if complaint:
-        return jsonify(complaint.serialize(), 200)
+    user_id = data.get('user_id')
+    title = data.get('title')
+    created_at = datetime.now().isoformat()
+    description = data.get('description')
+    status = data.get('status')
+    conn = sqlite3.connect('instance/my_database.db')
+    cursor = conn.cursor()
+    check = cursor.execute('INSERT INTO complaint (user_id, created_at, description, status, title) VALUES (?, ?, ?, ?, ?)', (user_id, created_at, description, status, title))
+    conn.commit()
+    if check:
+        return jsonify({'message': 'Complaint created successfully'}, 201)
     else:
-        return jsonify({'error': 'Complaint not found'}, 404)
+        return jsonify({'error': 'Complaint not created'}, 400)
+
+@app.route('/api/complaints/responseComplaint', methods=['PUT'])
+def response_complaint():
+    data = request.get_json()
+    complaint_id = data.get('complaint_id')
+    response = data.get('response')
+    responder_id = data.get('responder_id')
+    responded_at = datetime.now().isoformat()
+    status = data.get('status')
+    response_description = data.get('response_description')
+    response_username = data.get('response_username')
+    conn = sqlite3.connect('instance/my_database.db')
+    cursor = conn.cursor()
+    check = cursor.execute('UPDATE complaint SET response = ?, responder_id = ?, responded_at = ?, status = ?, response_description = ?, response_username = ? WHERE id = ?', (response, responder_id, responded_at, status, response_description, response_username, complaint_id))
+    conn.commit()
+    if check:
+        return jsonify({'message': 'Complaint response updated successfully'}, 200)
+    else:
+        return jsonify({'error': 'Complaint response not updated'}, 400)
+
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Create the database
     app.run()
