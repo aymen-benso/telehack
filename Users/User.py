@@ -38,13 +38,35 @@ class User(db.Model):
         self.is_blocked = True
         db.session.commit()
     
+    def unblock_user(self):
+        self.is_blocked = False
+        db.session.commit()
+    
     def auth(username, password):
         with app.app_context():
             user = User.query.filter_by(username=username).first()
             if user and check_password_hash(user.password_hash, password):
                 return user
             return None
+        
+    def get_user_by_username(username):
+        with app.app_context():
+            user = User.query.filter_by(username=username).first()
+            if user:
+                return user 
+            return None
+        
+    def update_user(self, part, value):
+        with app.app_context():
+            setattr(self, part, value)
+            db.session.commit()
     
+    def delete_user(self):
+        with app.app_context():
+            db.session.delete(self)
+            db.session.commit()
+    
+
     @staticmethod
     def username_exists(username):
         with app.app_context():
